@@ -1,0 +1,13 @@
+node_modules/
+client/node_modules/
+.env
+*.log
+.DS_Store
+dist/
+build/
+client/build/
+*.db
+*.sqlite
+*.sqlite3
+
+/.idea
