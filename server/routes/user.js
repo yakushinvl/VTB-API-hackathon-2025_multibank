@@ -43,6 +43,27 @@ router.get('/profile', authenticateToken, (req, res) => {
   );
 });
 
+// Активировать подписку
+router.post('/subscribe', authenticateToken, (req, res) => {
+  const db = getDB();
+  const userId = req.user.id;
+
+  db.run(
+    'UPDATE users SET subscription_active = 1 WHERE id = ?',
+    [userId],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ message: 'Ошибка активации подписки' });
+      }
+
+      res.json({ 
+        message: 'Подписка успешно активирована',
+        subscription_active: true
+      });
+    }
+  );
+});
+
 // Обновить профиль
 router.put('/profile', authenticateToken, [
   body('username').optional().isLength({ min: 3 }).withMessage('Логин должен быть минимум 3 символа'),
@@ -166,4 +187,3 @@ router.put('/password', authenticateToken, [
 });
 
 module.exports = router;
-

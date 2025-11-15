@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import './Assistant.css';
 
 function Assistant() {
-  const { user } = useAuth();
+  const { user, checkAuth } = useAuth();
+  const { showNotification } = useNotifications();
   const [analysis, setAnalysis] = useState(null);
   const [cashback, setCashback] = useState(null);
   const [chatMessages, setChatMessages] = useState([]);
@@ -65,12 +67,38 @@ function Assistant() {
     }).format(amount);
   };
 
+  const handleSubscribe = async () => {
+    try {
+      const response = await api.post('/user/subscribe');
+      showNotification('Подписка успешно активирована!', 'success');
+      checkAuth(); // Обновить данные пользователя
+    } catch (error) {
+      showNotification(error.response?.data?.message || 'Ошибка активации подписки', 'error');
+    }
+  };
+
   if (!user?.subscription_active) {
     return (
       <div className="container">
         <div className="subscription-required">
           <h2>Требуется подписка</h2>
           <p>Функция ИИ-помощника доступна только для пользователей с активной подпиской.</p>
+          <div className="subscription-features">
+            <h3>С подпиской вы получите:</h3>
+            <ul>
+              <li>✓ Детальный анализ ваших трат</li>
+              <li>✓ Персонализированные рекомендации</li>
+              <li>✓ Оптимизация кэшбэка</li>
+              <li>✓ ИИ-помощник для финансового планирования</li>
+            </ul>
+            <button 
+              className="btn btn-primary" 
+              style={{ marginTop: '20px' }}
+              onClick={handleSubscribe}
+            >
+              Оформить подписку
+            </button>
+          </div>
         </div>
       </div>
     );

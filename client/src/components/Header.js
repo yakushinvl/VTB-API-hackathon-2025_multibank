@@ -29,9 +29,7 @@ function Header() {
           <Link to="/" className="nav-link">Главная</Link>
           <Link to="/transactions" className="nav-link">Транзакции</Link>
           <Link to="/offers" className="nav-link">Предложения</Link>
-          {user?.subscription_active && (
-            <Link to="/assistant" className="nav-link">Помощник</Link>
-          )}
+          <Link to="/assistant" className="nav-link">Помощник</Link>
         </nav>
       </div>
       <div className="header-right">

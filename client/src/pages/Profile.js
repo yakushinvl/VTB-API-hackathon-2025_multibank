@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import './Profile.css';
 
 function Profile() {
   const { user, checkAuth } = useAuth();
+  const { showNotification } = useNotifications();
   const [profile, setProfile] = useState(null);
   const [connectedBanks, setConnectedBanks] = useState([]);
   const [availableBanks, setAvailableBanks] = useState([]);
@@ -15,7 +17,6 @@ function Profile() {
     newPassword: '',
     confirmPassword: ''
   });
-  const [message, setMessage] = useState('');
 
   useEffect(() => {
     loadProfile();
@@ -49,8 +50,10 @@ function Profile() {
       setProfile(prev => ({ ...prev, theme }));
       checkAuth();
       document.body.className = theme === 'dark' ? 'dark' : '';
+      showNotification('Тема изменена', 'success');
     } catch (error) {
       console.error('Ошибка изменения темы:', error);
+      showNotification('Ошибка изменения темы', 'error');
     }
   };
 
@@ -59,8 +62,11 @@ function Profile() {
       await api.put('/user/profile', { language });
       setProfile(prev => ({ ...prev, language }));
       checkAuth();
+      document.documentElement.lang = language;
+      showNotification('Язык изменен', 'success');
     } catch (error) {
       console.error('Ошибка изменения языка:', error);
+      showNotification('Ошибка изменения языка', 'error');
     }
   };
 
@@ -68,11 +74,12 @@ function Profile() {
     try {
       const response = await api.post(`/banks/connect/${bankName}`);
       if (response.data.authUrl) {
-        window.open(response.data.authUrl, '_blank');
+        // Открываем в том же окне для правильной обработки callback
+        window.location.href = response.data.authUrl;
       }
     } catch (error) {
       console.error('Ошибка подключения банка:', error);
-      setMessage('Ошибка подключения банка');
+      showNotification(error.response?.data?.message || 'Ошибка подключения банка', 'error');
     }
   };
 
@@ -80,17 +87,17 @@ function Profile() {
     try {
       await api.delete(`/banks/${connectionId}`);
       loadProfile();
-      setMessage('Банк успешно отключен');
+      showNotification('Банк успешно отключен', 'success');
     } catch (error) {
-      console.error('Ошибка отключения банка:', error);
-      setMessage('Ошибка отключения банка');
+      console.error('Ошибка отключения банка:', 'error');
+      showNotification('Ошибка отключения банка', 'error');
     }
   };
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage('Пароли не совпадают');
+      showNotification('Пароли не совпадают', 'error');
       return;
     }
 
@@ -100,7 +107,7 @@ function Profile() {
         newPassword: passwordData.newPassword,
         confirmPassword: passwordData.confirmPassword
       });
-      setMessage('Пароль успешно изменен');
+      showNotification('Пароль успешно изменен', 'success');
       setShowPasswordForm(false);
       setPasswordData({
         currentPassword: '',
@@ -108,7 +115,7 @@ function Profile() {
         confirmPassword: ''
       });
     } catch (error) {
-      setMessage(error.response?.data?.message || 'Ошибка изменения пароля');
+      showNotification(error.response?.data?.message || 'Ошибка изменения пароля', 'error');
     }
   };
 
@@ -123,12 +130,6 @@ function Profile() {
   return (
     <div className="container">
       <h1>Профиль</h1>
-
-      {message && (
-        <div className={`message ${message.includes('Ошибка') ? 'error' : 'success'}`}>
-          {message}
-        </div>
-      )}
 
       {/* Информация о пользователе */}
       <section className="profile-section">

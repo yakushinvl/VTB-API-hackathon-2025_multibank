@@ -29,6 +29,16 @@ body.dark .card {
   color: #ffffff;
 }
 
+body.dark .input {
+  background-color: #3d3d3d;
+  color: #ffffff;
+  border-color: #555;
+}
+
+body.dark .input:focus {
+  border-color: #007bff;
+}
+
 /* Общие стили */
 .container {
   max-width: 1200px;

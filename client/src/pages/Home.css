@@ -8,6 +8,10 @@
   color: #333;
 }
 
+body.dark .section-title {
+  color: #ffffff;
+}
+
 .tabs {
   display: flex;
   gap: 10px;
@@ -54,6 +58,11 @@
   color: inherit;
 }
 
+body.dark .item-card {
+  background: #2d2d2d;
+  color: #ffffff;
+}
+
 .item-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0,0,0,0.15);
@@ -76,6 +85,10 @@
   margin-bottom: 5px;
 }
 
+body.dark .item-number {
+  color: #cccccc;
+}
+
 .item-balance {
   font-size: 24px;
   font-weight: bold;
@@ -88,10 +101,18 @@
   margin-top: 10px;
 }
 
+body.dark .item-meta {
+  color: #aaaaaa;
+}
+
 .empty-message {
   text-align: center;
   color: #999;
   padding: 40px;
   font-size: 16px;
+}
+
+body.dark .empty-message {
+  color: #cccccc;
 }
 

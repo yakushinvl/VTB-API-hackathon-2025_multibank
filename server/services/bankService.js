@@ -57,15 +57,13 @@ async function refreshAccessToken(userId, bankConnectionId) {
 
         try {
           // Запрос на обновление токена
-          const response = await axios.post(bankConfig.tokenUrl, {
-            grant_type: 'refresh_token',
-            refresh_token: connection.refresh_token,
-            client_id: process.env[`${connection.bank_name.toUpperCase()}_CLIENT_ID`] || 'default',
-            client_secret: process.env[`${connection.bank_name.toUpperCase()}_CLIENT_SECRET`] || 'default'
-          });
+          const { refreshToken } = require('../utils/bankApiHelper');
+          
+          const response = await refreshToken(bankConfig.tokenUrl, connection.refresh_token);
 
-          const { access_token, refresh_token, expires_in } = response.data;
-          const expiresAt = new Date(Date.now() + expires_in * 1000);
+          const { access_token, refresh_token, expires_in } = response;
+          // Токен работает 24 часа (86400 секунд)
+          const expiresAt = new Date(Date.now() + (expires_in || 86400) * 1000);
 
           // Обновление токена в БД
           db.run(
@@ -105,20 +103,26 @@ async function getValidAccessToken(userId, bankConnectionId) {
           return;
         }
 
-        // Проверка срока действия токена
+        // Проверка срока действия токена (обновляем за 1 час до истечения)
         const expiresAt = new Date(connection.token_expires_at);
         const now = new Date();
+        const oneHourBeforeExpiry = new Date(expiresAt.getTime() - 60 * 60 * 1000);
         
-        if (expiresAt > now) {
+        if (now < oneHourBeforeExpiry) {
           // Токен валиден
           resolve(connection.access_token);
         } else {
-          // Токен истек, обновляем
+          // Токен скоро истечет или истек, обновляем
           try {
             const newToken = await refreshAccessToken(userId, bankConnectionId);
             resolve(newToken);
           } catch (error) {
-            reject(error);
+            // Если не удалось обновить, пробуем использовать старый токен
+            if (expiresAt > now) {
+              resolve(connection.access_token);
+            } else {
+              reject(error);
+            }
           }
         }
       }
@@ -149,23 +153,20 @@ async function makeBankRequest(userId, bankConnectionId, endpoint, method = 'GET
           }
 
           const url = `${bankConfig.baseUrl}${endpoint}`;
-          const config = {
-            method,
-            url,
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          };
-
-          if (data) {
-            config.data = data;
-          }
+          const { makeApiRequest } = require('../utils/bankApiHelper');
 
           try {
-            const response = await axios(config);
-            resolve(response.data);
+            const responseData = await makeApiRequest(url, method, token, data);
+            resolve(responseData);
           } catch (error) {
+            // Логируем ошибку для отладки
+            console.error(`Ошибка запроса к банку ${connection.bank_name}:`, {
+              url,
+              method,
+              status: error.response?.status,
+              data: error.response?.data,
+              message: error.message
+            });
             reject(error);
           }
         }
@@ -239,7 +240,8 @@ async function syncAccounts(userId, bankConnectionId) {
 // Синхронизация карт
 async function syncCards(userId, bankConnectionId) {
   try {
-    const cardsData = await makeBankRequest(userId, bankConnectionId, '/api/v1/cards');
+    // Проверяем правильный endpoint согласно документации API
+    const cardsData = await makeBankRequest(userId, bankConnectionId, '/api/v1/cards', 'GET');
     const db = getDB();
     
     return new Promise((resolve, reject) => {
@@ -299,6 +301,7 @@ async function syncCards(userId, bankConnectionId) {
 // Синхронизация транзакций
 async function syncTransactions(userId, bankConnectionId, accountId = null, cardId = null) {
   try {
+    // Проверяем правильные endpoints согласно документации API
     let endpoint = '/api/v1/transactions';
     if (accountId) {
       endpoint = `/api/v1/accounts/${accountId}/transactions`;
@@ -306,7 +309,7 @@ async function syncTransactions(userId, bankConnectionId, accountId = null, card
       endpoint = `/api/v1/cards/${cardId}/transactions`;
     }
 
-    const transactionsData = await makeBankRequest(userId, bankConnectionId, endpoint);
+    const transactionsData = await makeBankRequest(userId, bankConnectionId, endpoint, 'GET');
     const db = getDB();
     
     return new Promise((resolve, reject) => {

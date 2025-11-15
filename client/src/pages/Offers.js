@@ -8,7 +8,11 @@ function Offers() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadOffers();
+    const timer = setTimeout(() => {
+      loadOffers();
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timer);
   }, [search]);
 
   const loadOffers = async () => {

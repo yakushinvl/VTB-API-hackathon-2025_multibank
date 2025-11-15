@@ -4,6 +4,12 @@
   padding: 30px;
   margin-bottom: 30px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  color: #333;
+}
+
+body.dark .detail-card {
+  background: #2d2d2d;
+  color: #ffffff;
 }
 
 .detail-header {
@@ -23,6 +29,10 @@
   margin: 0;
   font-size: 24px;
   color: #333;
+}
+
+body.dark .detail-header h2 {
+  color: #ffffff;
 }
 
 .detail-meta {
@@ -63,6 +73,11 @@
   padding: 12px;
   background: #f9f9f9;
   border-radius: 4px;
+}
+
+body.dark .info-item {
+  background: #3d3d3d;
+  color: #ffffff;
 }
 
 .info-label {

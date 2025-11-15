@@ -12,6 +12,11 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+body.dark .stat-card {
+  background: #2d2d2d;
+  color: #ffffff;
+}
+
 .stat-label {
   font-size: 14px;
   color: #666;
@@ -61,6 +66,11 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+body.dark .transactions-list {
+  background: #2d2d2d;
+  color: #ffffff;
+}
+
 .transaction-item {
   display: flex;
   justify-content: space-between;
@@ -72,6 +82,10 @@
 
 .transaction-item:hover {
   background: #f9f9f9;
+}
+
+body.dark .transaction-item:hover {
+  background: #3d3d3d;
 }
 
 .transaction-item:last-child {

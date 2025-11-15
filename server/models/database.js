@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, '../../multibank.db');
+const DB_PATH = path.resolve('./multibank.db');
 
 let db = null;
 

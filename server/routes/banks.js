@@ -42,10 +42,10 @@ router.post('/connect/:bankName', authenticateToken, (req, res) => {
     return res.status(400).json({ message: 'Банк не найден' });
   }
 
-  // В реальном приложении здесь был бы полный OAuth flow
-  // Для примера возвращаем URL для авторизации
+  // OAuth flow с реальными credentials
   const redirectUri = `${process.env.CLIENT_URL || 'http://localhost:3000'}/oauth/callback`;
-  const clientId = process.env[`${bankName.toUpperCase()}_CLIENT_ID`] || 'default-client-id';
+  const clientId = process.env.BANK_CLIENT_ID || 'team264';
+  const clientSecret = process.env.BANK_CLIENT_SECRET || 'gRmcwJHKX9hccsqvG4PzqmdSRqCF9IZx';
   
   const authUrl = `${bankConfig.authUrl}?` +
     `client_id=${clientId}&` +
@@ -56,7 +56,9 @@ router.post('/connect/:bankName', authenticateToken, (req, res) => {
 
   res.json({
     authUrl,
-    message: 'Перейдите по ссылке для авторизации'
+    message: 'Перейдите по ссылке для авторизации',
+    clientId,
+    redirectUri
   });
 });
 
@@ -75,29 +77,41 @@ router.post('/callback', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Банк не найден' });
     }
 
-    // В реальном приложении здесь был бы обмен code на токены
-    // Для примера используем моковые токены
-    const accessToken = `mock_access_token_${Date.now()}`;
-    const refreshToken = `mock_refresh_token_${Date.now()}`;
-    const expiresAt = new Date(Date.now() + 3600 * 1000); // 1 час
+    const redirectUri = `${process.env.CLIENT_URL || 'http://localhost:3000'}/oauth/callback`;
+    const { exchangeCodeForTokens } = require('../utils/bankApiHelper');
 
-    const db = getDB();
-    db.run(
-      `INSERT INTO bank_connections 
-       (user_id, bank_name, bank_domain, access_token, refresh_token, token_expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [userId, bankConfig.name, bankConfig.domain, accessToken, refreshToken, expiresAt],
-      function(err) {
-        if (err) {
-          return res.status(500).json({ message: 'Ошибка сохранения подключения' });
+    // Обмен code на токены
+    try {
+      const tokenResponse = await exchangeCodeForTokens(bankConfig.tokenUrl, code, redirectUri);
+
+      const { access_token, refresh_token, expires_in } = tokenResponse;
+      // Токен работает 24 часа
+      const expiresAt = new Date(Date.now() + (expires_in || 86400) * 1000);
+
+      const db = getDB();
+      db.run(
+        `INSERT INTO bank_connections 
+         (user_id, bank_name, bank_domain, access_token, refresh_token, token_expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [userId, bankConfig.name, bankConfig.domain, access_token, refresh_token, expiresAt],
+        function(err) {
+          if (err) {
+            return res.status(500).json({ message: 'Ошибка сохранения подключения' });
+          }
+
+          res.json({
+            message: 'Банк успешно подключен',
+            connectionId: this.lastID
+          });
         }
-
-        res.json({
-          message: 'Банк успешно подключен',
-          connectionId: this.lastID
-        });
-      }
-    );
+      );
+    } catch (tokenError) {
+      console.error('Ошибка получения токена:', tokenError.response?.data || tokenError.message);
+      return res.status(500).json({ 
+        message: 'Ошибка получения токена от банка',
+        error: tokenError.response?.data || tokenError.message
+      });
+    }
   } catch (error) {
     res.status(500).json({ message: 'Ошибка обработки callback', error: error.message });
   }
