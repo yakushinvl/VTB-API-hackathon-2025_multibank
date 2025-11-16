@@ -73,13 +73,52 @@ function Profile() {
   const handleConnectBank = async (bankName) => {
     try {
       const response = await api.post(`/banks/connect/${bankName}`);
-      if (response.data.authUrl) {
-        // Открываем в том же окне для правильной обработки callback
-        window.location.href = response.data.authUrl;
-      }
+      const message = response.data.syncResults 
+        ? `${response.data.message} (Синхронизировано: ${response.data.syncResults.accounts} счетов, ${response.data.syncResults.cards} карт)`
+        : response.data.message || 'Банк успешно подключен';
+      showNotification(message, 'success');
+      loadProfile(); // Перезагружаем профиль для обновления списка подключенных банков
     } catch (error) {
       console.error('Ошибка подключения банка:', error);
       showNotification(error.response?.data?.message || 'Ошибка подключения банка', 'error');
+    }
+  };
+
+  const handleSyncBank = async (connectionId) => {
+    try {
+      console.log(`[handleSyncBank] Начинаем синхронизацию для connectionId=${connectionId}`);
+      console.log(`[handleSyncBank] Запрос к /api/accounts/sync с body:`, { bankConnectionId: connectionId });
+      console.log(`[handleSyncBank] Запрос к /api/cards/sync с body:`, { bankConnectionId: connectionId });
+      
+      showNotification('Синхронизация данных...', 'info');
+      const [accountsRes, cardsRes] = await Promise.allSettled([
+        api.post('/accounts/sync', { bankConnectionId: connectionId }),
+        api.post('/cards/sync', { bankConnectionId: connectionId })
+      ]);
+      
+      console.log(`[handleSyncBank] Результат синхронизации счетов:`, accountsRes);
+      console.log(`[handleSyncBank] Результат синхронизации карт:`, cardsRes);
+      
+      if (accountsRes.status === 'rejected') {
+        console.error('[handleSyncBank] Ошибка синхронизации счетов:', accountsRes.reason);
+        console.error('[handleSyncBank] Детали ошибки счетов:', accountsRes.reason?.response?.data);
+      }
+      if (cardsRes.status === 'rejected') {
+        console.error('[handleSyncBank] Ошибка синхронизации карт:', cardsRes.reason);
+        console.error('[handleSyncBank] Детали ошибки карт:', cardsRes.reason?.response?.data);
+      }
+      
+      const accountsSynced = accountsRes.status === 'fulfilled' ? accountsRes.value.data.synced || 0 : 0;
+      const cardsSynced = cardsRes.status === 'fulfilled' ? cardsRes.value.data.synced || 0 : 0;
+      
+      console.log(`[handleSyncBank] Синхронизировано: ${accountsSynced} счетов, ${cardsSynced} карт`);
+      
+      showNotification(`Синхронизация завершена: ${accountsSynced} счетов, ${cardsSynced} карт`, 'success');
+      loadProfile();
+    } catch (error) {
+      console.error('[handleSyncBank] Критическая ошибка синхронизации:', error);
+      console.error('[handleSyncBank] Детали ошибки:', error.response?.data);
+      showNotification('Ошибка синхронизации данных', 'error');
     }
   };
 
@@ -225,12 +264,21 @@ function Profile() {
                     Подключен: {new Date(bank.connected_at).toLocaleDateString('ru-RU')}
                   </div>
                 </div>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleDisconnectBank(bank.id)}
-                >
-                  Отключить
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => handleSyncBank(bank.id)}
+                    style={{ fontSize: '14px', padding: '8px 16px' }}
+                  >
+                    Синхронизировать
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => handleDisconnectBank(bank.id)}
+                  >
+                    Отключить
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

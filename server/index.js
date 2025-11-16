@@ -18,9 +18,8 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Инициализация базы данных
+// Инициализация базы данных и запуск сервера
 const db = require('./models/database');
-db.init();
 
 // Роуты
 app.use('/api/auth', require('./routes/auth'));
@@ -49,8 +48,17 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Сервер запущен на порту ${PORT}`);
-  console.log(`📱 Режим: ${process.env.NODE_ENV || 'development'}`);
-});
+// Инициализация БД и запуск сервера
+db.init()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Сервер запущен на порту ${PORT}`);
+      console.log(`📱 Режим: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 API доступен по адресу: http://localhost:${PORT}/api`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Ошибка инициализации базы данных:', err);
+    process.exit(1);
+  });
 

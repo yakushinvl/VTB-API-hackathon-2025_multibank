@@ -53,9 +53,10 @@ function createTables() {
           user_id INTEGER NOT NULL,
           bank_name TEXT NOT NULL,
           bank_domain TEXT,
-          access_token TEXT NOT NULL,
+          access_token TEXT,
           refresh_token TEXT,
           token_expires_at DATETIME,
+          consent_id TEXT,
           connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )

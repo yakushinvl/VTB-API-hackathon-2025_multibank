@@ -34,7 +34,7 @@ router.get('/', authenticateToken, async (req, res) => {
             const offers = await makeBankRequest(
               userId,
               connection.id,
-              '/api/v1/offers'
+              '/products'
             );
 
             const offersList = Array.isArray(offers) ? offers : (offers.offers || []);

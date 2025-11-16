@@ -1,6 +1,6 @@
 /**
  * Вспомогательные функции для работы с банковскими API
- * Согласно стандартам Open Banking API и OAuth 2.0
+ * Прямые запросы с Basic Auth (без OAuth)
  */
 
 const axios = require('axios');
@@ -24,91 +24,78 @@ function createBasicAuthHeader(clientId, clientSecret) {
 }
 
 /**
- * Отправить POST запрос для получения токена
- * Поддерживает оба варианта: Basic Auth и передача в теле
+ * Получить токен банка через POST /auth/bank-token
+ * client_id и client_secret передаются как query параметры
  */
-async function requestToken(tokenUrl, params, useBasicAuth = true) {
-  const querystring = require('querystring');
+async function getBankToken(baseUrl) {
   const { clientId, clientSecret } = getBankCredentials();
+  const url = `${baseUrl}/auth/bank-token?client_id=${encodeURIComponent(clientId)}&client_secret=${encodeURIComponent(clientSecret)}`;
   
-  const tokenData = querystring.stringify(params);
-  
-  const headers = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Accept': 'application/json'
-  };
-
-  // Некоторые API требуют Basic Auth
-  if (useBasicAuth) {
-    headers['Authorization'] = createBasicAuthHeader(clientId, clientSecret);
-  }
+  console.log(`[getBankToken] ==========================================`);
+  console.log(`[getBankToken] ПОЛУЧЕНИЕ ТОКЕНА - POST ЗАПРОС ДЛЯ КОПИРОВАНИЯ:`);
+  console.log(`[getBankToken] URL: ${url}`);
+  console.log(`[getBankToken] Метод: POST`);
+  console.log(`[getBankToken] Headers:`);
+  console.log(`[getBankToken]   accept: application/json`);
+  console.log(`[getBankToken] Body: '' (пустая строка)`);
+  console.log(`[getBankToken] ==========================================`);
 
   try {
-    const response = await axios.post(tokenUrl, tokenData, {
-      headers,
-      timeout: 30000,
-      validateStatus: (status) => status < 500 // Не выбрасывать ошибку для 4xx
+    // Отправляем пустое тело (пустая строка) с query параметрами
+    const response = await axios.post(url, '', {
+      headers: {
+        'accept': 'application/json'
+      },
+      timeout: 30000
     });
-
-    if (response.status >= 400) {
-      // Если получили 401 с Basic Auth, пробуем без него
-      if (useBasicAuth && response.status === 401) {
-        return requestToken(tokenUrl, params, false);
-      }
-      throw new Error(`Ошибка получения токена: ${response.status} - ${JSON.stringify(response.data)}`);
-    }
-
+    
+    console.log(`[getBankToken] Токен получен успешно`);
+    console.log(`[getBankToken] Ответ:`, JSON.stringify(response.data, null, 2));
     return response.data;
   } catch (error) {
-    // Если ошибка и использовали Basic Auth, пробуем без него
-    if (useBasicAuth && error.response?.status === 401) {
-      return requestToken(tokenUrl, params, false);
+    console.error(`[getBankToken] Ошибка получения токена:`, {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+    // Выводим полную информацию об ошибке валидации
+    if (error.response?.data?.detail) {
+      console.error(`[getBankToken] Детали ошибки валидации:`, JSON.stringify(error.response.data.detail, null, 2));
     }
     throw error;
   }
 }
 
 /**
- * Обмен authorization code на токены
+ * Выполнить запрос к банковскому API с токеном
  */
-async function exchangeCodeForTokens(tokenUrl, code, redirectUri) {
+async function makeApiRequest(url, method = 'GET', data = null, token = null) {
   const { clientId, clientSecret } = getBankCredentials();
   
-  return requestToken(tokenUrl, {
-    grant_type: 'authorization_code',
-    code: code,
-    redirect_uri: redirectUri,
-    client_id: clientId,
-    client_secret: clientSecret
-  });
-}
-
-/**
- * Обновление токена доступа
- */
-async function refreshToken(tokenUrl, refreshToken) {
-  const { clientId, clientSecret } = getBankCredentials();
+  // Добавляем client_id в URL как query параметр
+  const urlObj = new URL(url);
+  urlObj.searchParams.set('client_id', clientId);
+  const urlWithClientId = urlObj.toString();
   
-  return requestToken(tokenUrl, {
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    client_id: clientId,
-    client_secret: clientSecret
-  });
-}
+  const headers = {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+    'X-Client-Id': clientId,  // Добавляем client_id в заголовок
+    'client_id': clientId     // Также пробуем в обычном заголовке
+  };
 
-/**
- * Выполнить запрос к банковскому API
- */
-async function makeApiRequest(url, method, token, data = null) {
+  // Если есть токен, используем Bearer, иначе Basic Auth
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    const authHeader = createBasicAuthHeader(clientId, clientSecret);
+    headers['Authorization'] = authHeader;
+  }
+
   const config = {
     method,
-    url,
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
+    url: urlWithClientId,
+    headers,
     timeout: 30000
   };
 
@@ -121,9 +108,50 @@ async function makeApiRequest(url, method, token, data = null) {
   }
 
   try {
+    console.log(`[makeApiRequest] ==========================================`);
+    console.log(`[makeApiRequest] ВЫПОЛНЯЮ ЗАПРОС К БАНКОВСКОМУ API`);
+    console.log(`[makeApiRequest] ==========================================`);
+    console.log(`[makeApiRequest] URL (с client_id): ${urlWithClientId}`);
+    console.log(`[makeApiRequest] Метод: ${method}`);
+    console.log(`[makeApiRequest] Headers:`);
+    if (token) {
+      console.log(`[makeApiRequest]   Authorization: Bearer ${token}`);
+    } else {
+      console.log(`[makeApiRequest]   Authorization: Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`);
+    }
+    console.log(`[makeApiRequest]   X-Client-Id: ${clientId}`);
+    console.log(`[makeApiRequest]   client_id: ${clientId}`);
+    console.log(`[makeApiRequest]   Accept: application/json`);
+    console.log(`[makeApiRequest]   Content-Type: application/json`);
+    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      console.log(`[makeApiRequest] Body:`, JSON.stringify(data, null, 2));
+    } else if (data && method === 'GET') {
+      console.log(`[makeApiRequest] Query params:`, JSON.stringify(data, null, 2));
+    }
+    console.log(`[makeApiRequest] ==========================================`);
+    
     const response = await axios(config);
+    
+    console.log(`[makeApiRequest] ==========================================`);
+    console.log(`[makeApiRequest] УСПЕШНЫЙ ОТВЕТ ОТ API`);
+    console.log(`[makeApiRequest] ==========================================`);
+    console.log(`[makeApiRequest] Статус: ${response.status} ${response.statusText}`);
+    console.log(`[makeApiRequest] Headers ответа:`, JSON.stringify(response.headers, null, 2));
+    console.log(`[makeApiRequest] Тело ответа:`, JSON.stringify(response.data, null, 2));
+    console.log(`[makeApiRequest] ==========================================`);
+    
     return response.data;
   } catch (error) {
+    console.error(`[makeApiRequest] ==========================================`);
+    console.error(`[makeApiRequest] ОШИБКА ЗАПРОСА К API`);
+    console.error(`[makeApiRequest] ==========================================`);
+    console.error(`[makeApiRequest] URL (с client_id): ${urlWithClientId}`);
+    console.error(`[makeApiRequest] Метод: ${method}`);
+    console.error(`[makeApiRequest] Статус ошибки: ${error.response?.status} ${error.response?.statusText}`);
+    console.error(`[makeApiRequest] Данные ошибки:`, JSON.stringify(error.response?.data, null, 2));
+    console.error(`[makeApiRequest] Сообщение: ${error.message}`);
+    console.error(`[makeApiRequest] ==========================================`);
+    
     const errorInfo = {
       url,
       method,
@@ -133,7 +161,6 @@ async function makeApiRequest(url, method, token, data = null) {
       message: error.message
     };
     
-    console.error('Ошибка запроса к банковскому API:', errorInfo);
     throw error;
   }
 }
@@ -141,9 +168,6 @@ async function makeApiRequest(url, method, token, data = null) {
 module.exports = {
   getBankCredentials,
   createBasicAuthHeader,
-  requestToken,
-  exchangeCodeForTokens,
-  refreshToken,
+  getBankToken,
   makeApiRequest
 };
-

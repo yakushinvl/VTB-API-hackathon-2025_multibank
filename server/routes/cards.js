@@ -123,15 +123,22 @@ router.post('/sync', authenticateToken, async (req, res) => {
         }
 
         try {
+          console.log(`[cards/sync] Начинаем синхронизацию карт для userId=${userId}, bankConnectionId=${bankConnectionId}`);
           const result = await syncCards(userId, bankConnectionId);
+          console.log(`[cards/sync] Синхронизация завершена:`, result);
           res.json({ 
             message: 'Карты успешно синхронизированы',
-            ...result
+            synced: result.synced || 0,
+            errors: result.errors || []
           });
         } catch (error) {
+          console.error('[cards/sync] Ошибка синхронизации:', error);
+          console.error('[cards/sync] Stack trace:', error.stack);
           res.status(500).json({ 
             message: 'Ошибка синхронизации карт',
-            error: error.message 
+            error: error.message || 'Неизвестная ошибка',
+            details: error.response?.data || null,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
           });
         }
       }

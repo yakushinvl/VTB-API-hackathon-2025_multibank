@@ -111,15 +111,22 @@ router.post('/sync', authenticateToken, async (req, res) => {
         }
 
         try {
+          console.log(`[accounts/sync] Начинаем синхронизацию счетов для userId=${userId}, bankConnectionId=${bankConnectionId}`);
           const result = await syncAccounts(userId, bankConnectionId);
+          console.log(`[accounts/sync] Синхронизация завершена:`, result);
           res.json({ 
             message: 'Счета успешно синхронизированы',
-            ...result
+            synced: result.synced || 0,
+            errors: result.errors || []
           });
         } catch (error) {
+          console.error('[accounts/sync] Ошибка синхронизации:', error);
+          console.error('[accounts/sync] Stack trace:', error.stack);
           res.status(500).json({ 
             message: 'Ошибка синхронизации счетов',
-            error: error.message 
+            error: error.message || 'Неизвестная ошибка',
+            details: error.response?.data || null,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
           });
         }
       }
